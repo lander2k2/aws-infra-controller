@@ -1,0 +1,3 @@
+version: "1"
+domain: lander2k2.com
+repo: github.com/lander2k2/aws-infra-controller
