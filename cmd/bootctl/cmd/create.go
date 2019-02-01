@@ -15,6 +15,8 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -32,22 +34,101 @@ var createCmd = &cobra.Command{
 	Long: `The create command will call the infra provider's API and provision the
 necessary infrastructure for a new cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Print("Creating VPC...")
+		inv := aws.Inventory
 
+		log.Print("Creating VPC...")
 		vpc := aws.Vpc{Cidr: "10.0.0.0/16"}
-		err := aws.Provision(&vpc)
+		if err := aws.Provision(&vpc); err != nil {
+			log.Print("Failed to create VPC")
+			log.Fatal(err)
+		}
+		inv.VpcId = vpc.Id
+		log.Printf("VPC ID: %s", vpc.Id)
+
+		log.Print("Getting route table...")
+		rt := aws.RouteTable{VpcId: vpc.Id}
+		if err := aws.Get(&rt); err != nil {
+			log.Print("Failed to get route table")
+			log.Print("Deleting VPC that was created")
+			aws.Destroy(&vpc)
+			log.Fatal(err)
+		}
+		inv.RouteTableId = rt.Id
+		log.Printf("Route table ID: %s", rt.Id)
+
+		log.Print("Creating subnet...")
+		subnet := aws.Subnet{VpcId: vpc.Id, Cidr: "10.0.0.0/18"}
+		if err := aws.Provision(&subnet); err != nil {
+			log.Print("Failed to create subnet")
+			log.Print("Deleting VPC that was created")
+			aws.Destroy(&vpc)
+			log.Fatal(err)
+		}
+		inv.SubnetId = subnet.Id
+
+		log.Print("Creating internet gateway...")
+		igw := aws.InternetGateway{VpcId: vpc.Id, RouteTableId: rt.Id}
+		if err := aws.Provision(&igw); err != nil {
+			log.Print("Failed to create internet gateway")
+			log.Print("Deleting infrastructure that was created")
+			aws.Destroy(&subnet)
+			aws.Destroy(&vpc)
+			log.Fatal(err)
+		}
+		inv.InternetGatewayId = igw.Id
+
+		log.Print("Creating security group...")
+		sg := aws.SecurityGroup{
+			VpcId:       vpc.Id,
+			GroupName:   fmt.Sprintf("%s-security-group", Name),
+			Description: "Kubernetes bootstrap master security group",
+		}
+		if err := aws.Provision(&sg); err != nil {
+			log.Print("Failed to create security group")
+			log.Print("Deleting infrastructure that was created")
+			aws.Destroy(&igw)
+			aws.Destroy(&subnet)
+			aws.Destroy(&vpc)
+			log.Fatal(err)
+		}
+		inv.SecurityGroupId = sg.Id
+
+		log.Print("Creating EC2 instance...")
+		instance := aws.Instance{
+			SubnetId:        subnet.Id,
+			SecurityGroupId: sg.Id,
+			// hard coded var ami, ssh key /////////////////////////////////////
+			ImageId: "ami-0e2a10a0edd037f7e",
+			KeyName: "dev-richard",
+		}
+		if err := aws.Provision(&instance); err != nil {
+			log.Print("Failed to create EC2 instance")
+			log.Print("Deleting infrastructure that was created")
+			aws.Destroy(&sg)
+			aws.Destroy(&igw)
+			aws.Destroy(&subnet)
+			aws.Destroy(&vpc)
+			log.Fatal(err)
+		}
+		inv.InstanceId = instance.Id
+
+		///////////////////////////////////////////////////////////////////////
+		invJson, err := json.Marshal(inv)
 		if err != nil {
+			log.Print("Failed to marshal inventory to json")
+			log.Print("Deleting VPC")
+			aws.Destroy(&vpc)
 			log.Fatal(err)
 		}
 
-		log.Printf("VPC Id: %s", vpc.Id)
-
-		data := []byte(vpc.Id)
-		werr := ioutil.WriteFile("/tmp/aws-infra-controller.txt", data, 0644)
-		if err != nil {
-			log.Print(werr)
+		invContent := []byte(invJson)
+		if err := ioutil.WriteFile("/tmp/aws-infra-controller-inventory.json", invContent, 0644); err != nil {
+			log.Print("Failed to write inventory file")
+			log.Print("Deleting VPC")
+			aws.Destroy(&vpc)
+			log.Fatal(err)
 		}
-
+		log.Print(string(invJson))
 	},
 }
 

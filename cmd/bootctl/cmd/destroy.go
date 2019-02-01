@@ -15,8 +15,10 @@
 package cmd
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"log"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -30,20 +32,69 @@ var destroyCmd = &cobra.Command{
 	Long: `The destroy command will delete all the infrastructure for a specified
 cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Print("Deleting VPC...")
+		inv := aws.Inventory
 
-		data, err := ioutil.ReadFile("/tmp/aws-infra-controller.txt")
+		log.Print("Collecting inventory...")
+		invJson, err := ioutil.ReadFile("/tmp/aws-infra-controller-inventory.json")
 		if err != nil {
+			log.Print("Failed to read inventory file")
+			log.Fatal(err)
+		}
+		if err := json.Unmarshal(invJson, &inv); err != nil {
+			log.Print("Failed to unmarshal inventory json")
 			log.Fatal(err)
 		}
 
-		vpc := aws.Vpc{Id: string(data)}
-		derr := aws.Destroy(&vpc)
-		if derr != nil {
-			log.Fatal(derr)
+		log.Print("Deleting EC2 instance...")
+		log.Printf("Instance ID: %s", inv.InstanceId)
+		instance := aws.Instance{Id: inv.InstanceId}
+		if err := aws.Destroy(&instance); err != nil {
+			log.Print("Failed to delete instance")
+			log.Fatal(err)
 		}
 
-		log.Printf(string(data))
+		log.Print("Waiting for EC2 instance to terminate...")
+		for instance.Status != "terminated" {
+			if err := aws.Get(&instance); err != nil {
+				log.Print("Failed to get instance")
+				log.Fatal(err)
+			}
+			time.Sleep(time.Second * 2)
+			log.Print(".")
+		}
+		log.Print("EC2 instance terminated")
+
+		log.Print("Deleting security group...")
+		log.Printf("Security group ID: %s", inv.SecurityGroupId)
+		sg := aws.SecurityGroup{Id: inv.SecurityGroupId}
+		if err := aws.Destroy(&sg); err != nil {
+			log.Print("Failed to delete security group")
+			log.Fatal(err)
+		}
+
+		log.Print("Deleting internet gateway...")
+		log.Printf("Internet gateway ID: %s", inv.InternetGatewayId)
+		igw := aws.InternetGateway{Id: inv.InternetGatewayId, VpcId: inv.VpcId}
+		if err := aws.Destroy(&igw); err != nil {
+			log.Print("Failed to delete internet gateway")
+			log.Fatal(err)
+		}
+
+		log.Print("Deleting subnet...")
+		log.Printf("Subnet ID: %s", inv.SubnetId)
+		subnet := aws.Subnet{Id: inv.SubnetId}
+		if err := aws.Destroy(&subnet); err != nil {
+			log.Print("Failed to delete subnet")
+			log.Fatal(err)
+		}
+
+		log.Print("Deleting VPC...")
+		log.Printf("VPC ID: %s", inv.VpcId)
+		vpc := aws.Vpc{Id: inv.VpcId}
+		if err := aws.Destroy(&vpc); err != nil {
+			log.Print("Failed to delete VPC")
+			log.Fatal(err)
+		}
 	},
 }
 
