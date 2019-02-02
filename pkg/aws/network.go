@@ -1,45 +1,47 @@
 package aws
 
 import (
-	"log"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
 type Vpc struct {
-	Id   string
-	Cidr string
+	Id     string
+	Region string
+	Cidr   string
 }
 
 type RouteTable struct {
-	VpcId string
-	Id    string
+	VpcId  string
+	Id     string
+	Region string
 }
 
 type Subnet struct {
-	VpcId string
-	Id    string
-	Cidr  string
+	VpcId  string
+	Id     string
+	Region string
+	Cidr   string
 }
 
 type InternetGateway struct {
 	VpcId        string
 	RouteTableId string
 	Id           string
+	Region       string
 }
 
 type SecurityGroup struct {
 	VpcId       string
 	Id          string
+	Region      string
 	GroupName   string
 	Description string
 }
 
 func (vpc *Vpc) Create() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(vpc.Region)}))
 
 	reply, err := svc.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String(vpc.Cidr),
@@ -48,8 +50,8 @@ func (vpc *Vpc) Create() error {
 		return err
 	}
 
-	log.Printf("Reply: %s", reply)
 	vpc.Id = *reply.Vpc.VpcId
+
 	return nil
 }
 
@@ -58,17 +60,13 @@ func (vpc *Vpc) Describe() error {
 }
 
 func (vpc *Vpc) Delete() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(vpc.Region)}))
 
-	reply, err := svc.DeleteVpc(&ec2.DeleteVpcInput{
+	if _, err := svc.DeleteVpc(&ec2.DeleteVpcInput{
 		VpcId: aws.String(vpc.Id),
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
-
-	log.Printf("Reply: %s", reply)
 
 	return nil
 }
@@ -78,8 +76,7 @@ func (rt *RouteTable) Create() error {
 }
 
 func (rt *RouteTable) Describe() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(rt.Region)}))
 
 	reply, err := svc.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{&ec2.Filter{
@@ -93,7 +90,6 @@ func (rt *RouteTable) Describe() error {
 		return err
 	}
 
-	log.Printf("Reply: %s", reply)
 	rt.Id = *reply.RouteTables[0].RouteTableId
 
 	return nil
@@ -104,8 +100,7 @@ func (rt *RouteTable) Delete() error {
 }
 
 func (subnet *Subnet) Create() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(subnet.Region)}))
 
 	reply, err := svc.CreateSubnet(&ec2.CreateSubnetInput{
 		VpcId:     aws.String(subnet.VpcId),
@@ -115,7 +110,6 @@ func (subnet *Subnet) Create() error {
 		return err
 	}
 
-	log.Printf("Reply: %s", reply)
 	subnet.Id = *reply.Subnet.SubnetId
 
 	return nil
@@ -126,31 +120,25 @@ func (subnet *Subnet) Describe() error {
 }
 
 func (subnet *Subnet) Delete() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(subnet.Region)}))
 
-	reply, err := svc.DeleteSubnet(&ec2.DeleteSubnetInput{
+	if _, err := svc.DeleteSubnet(&ec2.DeleteSubnetInput{
 		SubnetId: aws.String(subnet.Id),
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
-
-	log.Printf("Reply: %s", reply)
 
 	return nil
 }
 
 func (igw *InternetGateway) Create() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(igw.Region)}))
 
 	reply, err := svc.CreateInternetGateway(&ec2.CreateInternetGatewayInput{})
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Reply: %s", reply)
 	igw.Id = *reply.InternetGateway.InternetGatewayId
 
 	if _, err := svc.AttachInternetGateway(&ec2.AttachInternetGatewayInput{
@@ -176,34 +164,26 @@ func (igw *InternetGateway) Describe() error {
 }
 
 func (igw *InternetGateway) Delete() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(igw.Region)}))
 
-	detachReply, err := svc.DetachInternetGateway(&ec2.DetachInternetGatewayInput{
+	if _, err := svc.DetachInternetGateway(&ec2.DetachInternetGatewayInput{
 		InternetGatewayId: aws.String(igw.Id),
 		VpcId:             aws.String(igw.VpcId),
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
-	log.Printf("Detach reply: %s", detachReply)
-
-	deleteReply, err := svc.DeleteInternetGateway(&ec2.DeleteInternetGatewayInput{
+	if _, err := svc.DeleteInternetGateway(&ec2.DeleteInternetGatewayInput{
 		InternetGatewayId: aws.String(igw.Id),
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
-
-	log.Printf("Delete reply: %s", deleteReply)
 
 	return nil
 }
 
 func (sg *SecurityGroup) Create() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(sg.Region)}))
 
 	reply, err := svc.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
 		GroupName:   aws.String(sg.GroupName),
@@ -214,7 +194,6 @@ func (sg *SecurityGroup) Create() error {
 		return err
 	}
 
-	log.Printf("Reply: %s", reply)
 	sg.Id = *reply.GroupId
 
 	if _, err := svc.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
@@ -247,17 +226,13 @@ func (sg *SecurityGroup) Describe() error {
 }
 
 func (sg *SecurityGroup) Delete() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(sg.Region)}))
 
-	reply, err := svc.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
+	if _, err := svc.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
 		GroupId: aws.String(sg.Id),
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
-
-	log.Printf("Reply: %s", reply)
 
 	return nil
 }

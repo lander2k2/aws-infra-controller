@@ -1,0 +1,5 @@
+name: test-01
+region: us-east-2
+ami: ami-0e2a10a0edd037f7e
+keyName: dev-richard
+

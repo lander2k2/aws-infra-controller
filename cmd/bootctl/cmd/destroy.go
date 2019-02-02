@@ -27,15 +27,16 @@ import (
 
 // destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
-	Use:   "destroy",
+	Use:   "destroy <inventory file>",
 	Short: "Destroy an existing cluster",
 	Long: `The destroy command will delete all the infrastructure for a specified
 cluster.`,
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		inv := aws.Inventory
 
-		log.Print("Collecting inventory...")
-		invJson, err := ioutil.ReadFile("/tmp/aws-infra-controller-inventory.json")
+		log.Print("Reading inventory...")
+		invJson, err := ioutil.ReadFile(args[0])
 		if err != nil {
 			log.Print("Failed to read inventory file")
 			log.Fatal(err)
@@ -47,7 +48,10 @@ cluster.`,
 
 		log.Print("Deleting EC2 instance...")
 		log.Printf("Instance ID: %s", inv.InstanceId)
-		instance := aws.Instance{Id: inv.InstanceId}
+		instance := aws.Instance{
+			Id:     inv.InstanceId,
+			Region: inv.Region,
+		}
 		if err := aws.Destroy(&instance); err != nil {
 			log.Print("Failed to delete instance")
 			log.Fatal(err)
@@ -59,14 +63,17 @@ cluster.`,
 				log.Print("Failed to get instance")
 				log.Fatal(err)
 			}
-			time.Sleep(time.Second * 2)
+			time.Sleep(time.Second * 5)
 			log.Print(".")
 		}
 		log.Print("EC2 instance terminated")
 
 		log.Print("Deleting security group...")
 		log.Printf("Security group ID: %s", inv.SecurityGroupId)
-		sg := aws.SecurityGroup{Id: inv.SecurityGroupId}
+		sg := aws.SecurityGroup{
+			Id:     inv.SecurityGroupId,
+			Region: inv.Region,
+		}
 		if err := aws.Destroy(&sg); err != nil {
 			log.Print("Failed to delete security group")
 			log.Fatal(err)
@@ -74,7 +81,11 @@ cluster.`,
 
 		log.Print("Deleting internet gateway...")
 		log.Printf("Internet gateway ID: %s", inv.InternetGatewayId)
-		igw := aws.InternetGateway{Id: inv.InternetGatewayId, VpcId: inv.VpcId}
+		igw := aws.InternetGateway{
+			Id:     inv.InternetGatewayId,
+			VpcId:  inv.VpcId,
+			Region: inv.Region,
+		}
 		if err := aws.Destroy(&igw); err != nil {
 			log.Print("Failed to delete internet gateway")
 			log.Fatal(err)
@@ -82,7 +93,10 @@ cluster.`,
 
 		log.Print("Deleting subnet...")
 		log.Printf("Subnet ID: %s", inv.SubnetId)
-		subnet := aws.Subnet{Id: inv.SubnetId}
+		subnet := aws.Subnet{
+			Id:     inv.SubnetId,
+			Region: inv.Region,
+		}
 		if err := aws.Destroy(&subnet); err != nil {
 			log.Print("Failed to delete subnet")
 			log.Fatal(err)
@@ -90,11 +104,16 @@ cluster.`,
 
 		log.Print("Deleting VPC...")
 		log.Printf("VPC ID: %s", inv.VpcId)
-		vpc := aws.Vpc{Id: inv.VpcId}
+		vpc := aws.Vpc{
+			Id:     inv.VpcId,
+			Region: inv.Region,
+		}
 		if err := aws.Destroy(&vpc); err != nil {
 			log.Print("Failed to delete VPC")
 			log.Fatal(err)
 		}
+
+		log.Println("Cluster destroyed")
 	},
 }
 

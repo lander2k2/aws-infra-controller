@@ -21,23 +21,40 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 
 	"github.com/lander2k2/aws-infra-controller/pkg/aws"
 )
 
-var Name string
-
 // createCmd represents the create command
 var createCmd = &cobra.Command{
-	Use:   "create",
+	Use:   "create <config file> <inventory file>",
 	Short: "Create a new cluster",
 	Long: `The create command will call the infra provider's API and provision the
 necessary infrastructure for a new cluster.`,
+	Args: cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		inv := aws.Inventory
+		config := aws.Config
+
+		log.Print("Reading configuration...")
+		configYaml, err := ioutil.ReadFile(args[0])
+		if err != nil {
+			log.Print("Failed to read config file")
+			log.Fatal(err)
+		}
+		if err := yaml.Unmarshal(configYaml, &config); err != nil {
+			log.Print("Failed to unmarshal config yaml")
+			log.Fatal(err)
+		}
+
+		inv.Region = config.Region
 
 		log.Print("Creating VPC...")
-		vpc := aws.Vpc{Cidr: "10.0.0.0/16"}
+		vpc := aws.Vpc{
+			Cidr:   "10.0.0.0/16",
+			Region: config.Region,
+		}
 		if err := aws.Provision(&vpc); err != nil {
 			log.Print("Failed to create VPC")
 			log.Fatal(err)
@@ -46,7 +63,10 @@ necessary infrastructure for a new cluster.`,
 		log.Printf("VPC ID: %s", vpc.Id)
 
 		log.Print("Getting route table...")
-		rt := aws.RouteTable{VpcId: vpc.Id}
+		rt := aws.RouteTable{
+			VpcId:  vpc.Id,
+			Region: config.Region,
+		}
 		if err := aws.Get(&rt); err != nil {
 			log.Print("Failed to get route table")
 			log.Print("Deleting VPC that was created")
@@ -57,7 +77,11 @@ necessary infrastructure for a new cluster.`,
 		log.Printf("Route table ID: %s", rt.Id)
 
 		log.Print("Creating subnet...")
-		subnet := aws.Subnet{VpcId: vpc.Id, Cidr: "10.0.0.0/18"}
+		subnet := aws.Subnet{
+			VpcId:  vpc.Id,
+			Region: config.Region,
+			Cidr:   "10.0.0.0/18",
+		}
 		if err := aws.Provision(&subnet); err != nil {
 			log.Print("Failed to create subnet")
 			log.Print("Deleting VPC that was created")
@@ -65,9 +89,14 @@ necessary infrastructure for a new cluster.`,
 			log.Fatal(err)
 		}
 		inv.SubnetId = subnet.Id
+		log.Printf("Subnet ID: %s", subnet.Id)
 
 		log.Print("Creating internet gateway...")
-		igw := aws.InternetGateway{VpcId: vpc.Id, RouteTableId: rt.Id}
+		igw := aws.InternetGateway{
+			VpcId:        vpc.Id,
+			Region:       config.Region,
+			RouteTableId: rt.Id,
+		}
 		if err := aws.Provision(&igw); err != nil {
 			log.Print("Failed to create internet gateway")
 			log.Print("Deleting infrastructure that was created")
@@ -76,11 +105,13 @@ necessary infrastructure for a new cluster.`,
 			log.Fatal(err)
 		}
 		inv.InternetGatewayId = igw.Id
+		log.Printf("Internet gateway ID: %s", igw.Id)
 
 		log.Print("Creating security group...")
 		sg := aws.SecurityGroup{
 			VpcId:       vpc.Id,
-			GroupName:   fmt.Sprintf("%s-security-group", Name),
+			Region:      config.Region,
+			GroupName:   fmt.Sprintf("%s-security-group", config.ClusterName),
 			Description: "Kubernetes bootstrap master security group",
 		}
 		if err := aws.Provision(&sg); err != nil {
@@ -92,14 +123,15 @@ necessary infrastructure for a new cluster.`,
 			log.Fatal(err)
 		}
 		inv.SecurityGroupId = sg.Id
+		log.Printf("Security group ID: %s", sg.Id)
 
 		log.Print("Creating EC2 instance...")
 		instance := aws.Instance{
 			SubnetId:        subnet.Id,
 			SecurityGroupId: sg.Id,
-			// hard coded var ami, ssh key /////////////////////////////////////
-			ImageId: "ami-0e2a10a0edd037f7e",
-			KeyName: "dev-richard",
+			Region:          config.Region,
+			ImageId:         config.MachineImage,
+			KeyName:         config.KeyName,
 		}
 		if err := aws.Provision(&instance); err != nil {
 			log.Print("Failed to create EC2 instance")
@@ -111,8 +143,8 @@ necessary infrastructure for a new cluster.`,
 			log.Fatal(err)
 		}
 		inv.InstanceId = instance.Id
+		log.Printf("Instance ID: %s", instance.Id)
 
-		///////////////////////////////////////////////////////////////////////
 		invJson, err := json.Marshal(inv)
 		if err != nil {
 			log.Print("Failed to marshal inventory to json")
@@ -122,13 +154,13 @@ necessary infrastructure for a new cluster.`,
 		}
 
 		invContent := []byte(invJson)
-		if err := ioutil.WriteFile("/tmp/aws-infra-controller-inventory.json", invContent, 0644); err != nil {
+		if err := ioutil.WriteFile(args[1], invContent, 0644); err != nil {
 			log.Print("Failed to write inventory file")
 			log.Print("Deleting VPC")
 			aws.Destroy(&vpc)
 			log.Fatal(err)
 		}
-		log.Print(string(invJson))
+		log.Printf("Inventory file saved at %s", args[1])
 	},
 }
 
@@ -144,5 +176,4 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// createCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	createCmd.Flags().StringVarP(&Name, "name", "n", "test-01", "Name for new cluster")
 }

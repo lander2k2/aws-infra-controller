@@ -1,8 +1,6 @@
 package aws
 
 import (
-	"log"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -12,14 +10,14 @@ type Instance struct {
 	SubnetId        string
 	SecurityGroupId string
 	Id              string
+	Region          string
 	ImageId         string
 	KeyName         string
 	Status          string
 }
 
 func (instance *Instance) Create() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(instance.Region)}))
 
 	reply, err := svc.RunInstances(&ec2.RunInstancesInput{
 		ImageId:      aws.String(instance.ImageId),
@@ -41,15 +39,13 @@ func (instance *Instance) Create() error {
 		return err
 	}
 
-	log.Printf("Reply: %s", reply)
 	instance.Id = *reply.Instances[0].InstanceId
 
 	return nil
 }
 
 func (instance *Instance) Describe() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(instance.Region)}))
 
 	reply, err := svc.DescribeInstanceStatus(&ec2.DescribeInstanceStatusInput{
 		IncludeAllInstances: aws.Bool(true),
@@ -59,26 +55,21 @@ func (instance *Instance) Describe() error {
 		return err
 	}
 
-	log.Print("Reply: %s", reply)
 	instance.Status = *reply.InstanceStatuses[0].InstanceState.Name
 
 	return nil
 }
 
 func (instance *Instance) Delete() error {
-	// hardcoded var: region ///////////////////////////////////////////////////
-	svc := ec2.New(session.New(&aws.Config{Region: aws.String("us-east-2")}))
+	svc := ec2.New(session.New(&aws.Config{Region: aws.String(instance.Region)}))
 
-	reply, err := svc.TerminateInstances(&ec2.TerminateInstancesInput{
+	if _, err := svc.TerminateInstances(&ec2.TerminateInstancesInput{
 		InstanceIds: []*string{
 			aws.String(instance.Id),
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
-
-	log.Printf("Reply: %s", reply)
 
 	return nil
 }
