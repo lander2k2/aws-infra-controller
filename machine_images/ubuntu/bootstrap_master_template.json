@@ -19,22 +19,22 @@
     "provisioners": [
         {
             "type": "file",
-            "source": "bootctl",
+            "source": "machine_images/ubuntu/bootctl",
             "destination": "/tmp/bootctl"
         },
         {
             "type": "file",
-            "source": "bootctl.service",
+            "source": "machine_images/ubuntu/bootctl.service",
             "destination": "/tmp/bootctl.service"
         },
         {
             "type": "file",
-            "source": "network.yaml",
+            "source": "machine_images/ubuntu/network.yaml",
             "destination": "/tmp/network.yaml"
         },
         {
             "type": "shell",
-            "script": "./installs.sh"
+            "script": "./machine_images/ubuntu/installs.sh"
         }
     ]
 }

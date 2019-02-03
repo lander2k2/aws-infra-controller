@@ -23,5 +23,4 @@ bin
 *.swo
 *~
 
-machine_images/ubuntu/bootctl
-cmd/bootctl/bootctl
+bootctl

@@ -53,3 +53,13 @@ docker-build: test
 # Push the docker image
 docker-push:
 	docker push ${IMG}
+
+# Build the machine image
+machine-image:
+	GOOS=linux go build -o machine_images/ubuntu/bootctl cmd/bootctl/main.go
+	packer build machine_images/ubuntu/bootstrap_master_template.json
+
+# Build bootctl
+bootctl:
+	go build -o bootctl cmd/bootctl/main.go
+
