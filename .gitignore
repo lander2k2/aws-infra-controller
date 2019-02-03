@@ -22,3 +22,6 @@ bin
 *.swp
 *.swo
 *~
+
+machine_images/ubuntu/bootctl
+

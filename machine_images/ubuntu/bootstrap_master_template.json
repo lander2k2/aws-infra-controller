@@ -18,6 +18,21 @@
     ],
     "provisioners": [
         {
+            "type": "file",
+            "source": "bootctl",
+            "destination": "/tmp/bootctl"
+        },
+        {
+            "type": "file",
+            "source": "bootctl.service",
+            "destination": "/tmp/bootctl.service"
+        },
+        {
+            "type": "file",
+            "source": "network.yaml",
+            "destination": "/tmp/network.yaml"
+        },
+        {
             "type": "shell",
             "script": "./installs.sh"
         }

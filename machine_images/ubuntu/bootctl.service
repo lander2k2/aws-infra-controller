@@ -1,0 +1,11 @@
+[Unit]
+Description=bootctl is the boot utility for the aws-infra-controller
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/bootctl boot
+TimeoutSec=infinity
+
+[Install]
+WantedBy=multi-user.target
+

@@ -160,6 +160,7 @@ necessary infrastructure for a new cluster.`,
 			aws.Destroy(&vpc)
 			log.Fatal(err)
 		}
+		log.Print("Cluster infrastructure created")
 		log.Printf("Inventory file saved at %s", args[1])
 	},
 }
