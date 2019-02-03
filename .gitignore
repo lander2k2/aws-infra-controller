@@ -24,4 +24,4 @@ bin
 *~
 
 machine_images/ubuntu/bootctl
-
+cmd/bootctl/bootctl

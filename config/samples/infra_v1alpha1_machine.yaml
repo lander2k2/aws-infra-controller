@@ -1,0 +1,10 @@
+apiVersion: infra.lander2k2.com/v1alpha1
+kind: Machine
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: master-01
+spec:
+  machineType: boot-master
+  ami: ami-0dd868743beab38aa
+  keyName: dev-richard

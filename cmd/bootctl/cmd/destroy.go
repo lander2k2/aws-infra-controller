@@ -16,27 +16,51 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	infra "github.com/lander2k2/aws-infra-controller/pkg/apis/infra/v1alpha1"
 	"github.com/lander2k2/aws-infra-controller/pkg/aws"
 )
 
+var InventoryConfig string
+
+func validateDestroyFlags() error {
+
+	if InventoryConfig == "" {
+		return errors.New("'-inventory-config' is a required flag")
+	}
+
+	if _, err := os.Stat(InventoryConfig); os.IsNotExist(err) {
+		return fmt.Errorf("Inventory config file not found: %s", InventoryConfig)
+	}
+
+	return nil
+}
+
 // destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
-	Use:   "destroy <inventory file>",
+	Use:   "destroy",
 	Short: "Destroy an existing cluster",
 	Long: `The destroy command will delete all the infrastructure for a specified
 cluster.`,
-	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		inv := aws.Inventory
+		if err := validateDestroyFlags(); err != nil {
+			log.Print("Failed to validate flags")
+			log.Print("'bootctl destroy -h' for help message")
+			log.Fatal(err)
+		}
+
+		inv := infra.Inventory{}
 
 		log.Print("Reading inventory...")
-		invJson, err := ioutil.ReadFile(args[0])
+		invJson, err := ioutil.ReadFile(InventoryConfig)
 		if err != nil {
 			log.Print("Failed to read inventory file")
 			log.Fatal(err)
@@ -47,10 +71,10 @@ cluster.`,
 		}
 
 		log.Print("Deleting EC2 instance...")
-		log.Printf("Instance ID: %s", inv.InstanceId)
+		log.Printf("Instance ID: %s", inv.Spec.InstanceId)
 		instance := aws.Instance{
-			Id:     inv.InstanceId,
-			Region: inv.Region,
+			Id:     inv.Spec.InstanceId,
+			Region: inv.Spec.Region,
 		}
 		if err := aws.Destroy(&instance); err != nil {
 			log.Print("Failed to delete instance")
@@ -69,10 +93,10 @@ cluster.`,
 		log.Print("EC2 instance terminated")
 
 		log.Print("Deleting security group...")
-		log.Printf("Security group ID: %s", inv.SecurityGroupId)
+		log.Printf("Security group ID: %s", inv.Spec.SecurityGroupId)
 		sg := aws.SecurityGroup{
-			Id:     inv.SecurityGroupId,
-			Region: inv.Region,
+			Id:     inv.Spec.SecurityGroupId,
+			Region: inv.Spec.Region,
 		}
 		if err := aws.Destroy(&sg); err != nil {
 			log.Print("Failed to delete security group")
@@ -80,11 +104,11 @@ cluster.`,
 		}
 
 		log.Print("Deleting internet gateway...")
-		log.Printf("Internet gateway ID: %s", inv.InternetGatewayId)
+		log.Printf("Internet gateway ID: %s", inv.Spec.InternetGatewayId)
 		igw := aws.InternetGateway{
-			Id:     inv.InternetGatewayId,
-			VpcId:  inv.VpcId,
-			Region: inv.Region,
+			Id:     inv.Spec.InternetGatewayId,
+			VpcId:  inv.Spec.VpcId,
+			Region: inv.Spec.Region,
 		}
 		if err := aws.Destroy(&igw); err != nil {
 			log.Print("Failed to delete internet gateway")
@@ -92,10 +116,10 @@ cluster.`,
 		}
 
 		log.Print("Deleting subnet...")
-		log.Printf("Subnet ID: %s", inv.SubnetId)
+		log.Printf("Subnet ID: %s", inv.Spec.SubnetId)
 		subnet := aws.Subnet{
-			Id:     inv.SubnetId,
-			Region: inv.Region,
+			Id:     inv.Spec.SubnetId,
+			Region: inv.Spec.Region,
 		}
 		if err := aws.Destroy(&subnet); err != nil {
 			log.Print("Failed to delete subnet")
@@ -103,10 +127,10 @@ cluster.`,
 		}
 
 		log.Print("Deleting VPC...")
-		log.Printf("VPC ID: %s", inv.VpcId)
+		log.Printf("VPC ID: %s", inv.Spec.VpcId)
 		vpc := aws.Vpc{
-			Id:     inv.VpcId,
-			Region: inv.Region,
+			Id:     inv.Spec.VpcId,
+			Region: inv.Spec.Region,
 		}
 		if err := aws.Destroy(&vpc); err != nil {
 			log.Print("Failed to delete VPC")
@@ -129,4 +153,5 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// destroyCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	destroyCmd.Flags().StringVarP(&InventoryConfig, "inventory-config", "i", "", "Inventory configuration file")
 }
