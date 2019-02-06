@@ -38,6 +38,30 @@ func (bucket *Bucket) Describe() error {
 func (bucket *Bucket) Delete() error {
 	svc := s3.New(session.New(&aws.Config{Region: aws.String(bucket.Region)}))
 
+	listReply, err := svc.ListObjects(&s3.ListObjectsInput{
+		Bucket: aws.String(bucket.Name),
+	})
+	if err != nil {
+		return err
+	}
+
+	if len((*listReply).Contents) != 0 {
+		deleteObjects := make([]*s3.ObjectIdentifier, 0, 1000)
+		for _, object := range (*listReply).Contents {
+			obj := s3.ObjectIdentifier{
+				Key: object.Key,
+			}
+			deleteObjects = append(deleteObjects, &obj)
+		}
+
+		if _, err := svc.DeleteObjects(&s3.DeleteObjectsInput{
+			Bucket: aws.String(bucket.Name),
+			Delete: &s3.Delete{Objects: deleteObjects},
+		}); err != nil {
+			return err
+		}
+	}
+
 	if _, err := svc.DeleteBucket(&s3.DeleteBucketInput{
 		Bucket: aws.String(bucket.Name),
 	}); err != nil {
