@@ -20,9 +20,15 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
-	//"syscall"
 
 	"github.com/spf13/cobra"
+
+	"github.com/lander2k2/aws-infra-controller/pkg/aws"
+)
+
+var (
+	Region    string
+	Artifacts string
 )
 
 // bootCmd represents the boot command
@@ -42,10 +48,12 @@ start the infrastructure controller.`,
 		}
 		log.Print(string(initOut))
 
-		log.Print("Making directory for kubeconfig file...")
-		if err := os.Mkdir("/home/ubuntu/.kube", os.FileMode(0777)); err != nil {
-			log.Print("Faild to create kubeconfig directory")
-			log.Fatal(err)
+		if _, err := os.Stat("/home/ubuntu/.kube"); os.IsNotExist(err) {
+			log.Print("Making directory for kubeconfig file...")
+			if err := os.Mkdir("/home/ubuntu/.kube", os.FileMode(0777)); err != nil {
+				log.Print("Faild to create kubeconfig directory")
+				log.Fatal(err)
+			}
 		}
 
 		log.Print("Copying kubeconfig file...")
@@ -84,12 +92,29 @@ start the infrastructure controller.`,
 
 		log.Print("Deploying pod network provider...")
 		netOut, err := exec.Command("/usr/bin/kubectl", "--kubeconfig", "/etc/kubernetes/admin.conf",
-			"apply", "-f", "/etc/kubernetes/manifests/network.yaml").CombinedOutput()
+			"apply", "-f", "/etc/kubernetes/network/network.yaml").CombinedOutput()
 		if err != nil {
 			log.Print("Failed to deploy pod network provider")
 			log.Fatal(err)
 		}
 		log.Print(string(netOut))
+
+		log.Print("Creating kubeadm join token...")
+		tokenOut, err := exec.Command("/usr/bin/kubeadm", "token", "create", "--print-join-command").CombinedOutput()
+		if err != nil {
+			log.Print("Failed to create new kubeadm join token")
+			log.Fatal(err)
+		}
+		object := aws.Object{
+			Region:   Region,
+			Location: Artifacts,
+			Body:     string(tokenOut),
+		}
+		if err := aws.Deposit(&object); err != nil {
+			log.Print("Failed to deposit kubeadm join artifact")
+			log.Fatal(err)
+		}
+		log.Print("Join token created and deposited on artifacts store")
 
 		log.Print("Kubernetes cluster booted")
 	},
@@ -107,4 +132,6 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// bootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	bootCmd.Flags().StringVarP(&Artifacts, "artifacts", "a", "", "Artifacts store")
+	bootCmd.Flags().StringVarP(&Region, "region", "r", "", "AWS region")
 }

@@ -6,5 +6,5 @@ metadata:
   name: master-01
 spec:
   machineType: boot-master
-  ami: ami-0dd868743beab38aa
+  ami: ami-06319b78d804e0d3c
   keyName: dev-richard

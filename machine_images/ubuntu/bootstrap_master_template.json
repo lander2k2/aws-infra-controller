@@ -24,11 +24,6 @@
         },
         {
             "type": "file",
-            "source": "machine_images/ubuntu/bootctl.service",
-            "destination": "/tmp/bootctl.service"
-        },
-        {
-            "type": "file",
             "source": "machine_images/ubuntu/network.yaml",
             "destination": "/tmp/network.yaml"
         },

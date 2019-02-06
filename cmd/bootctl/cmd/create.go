@@ -21,9 +21,11 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 
+	"github.com/ghodss/yaml"
+	"github.com/nu7hatch/gouuid"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
 	infra "github.com/lander2k2/aws-infra-controller/pkg/apis/infra/v1alpha1"
 	"github.com/lander2k2/aws-infra-controller/pkg/aws"
@@ -69,24 +71,34 @@ necessary infrastructure for a new cluster.`,
 		}
 
 		cluster := infra.Cluster{}
-		clusterConfig, err := ioutil.ReadFile(ClusterConfig)
+		clusterConfigYaml, err := ioutil.ReadFile(ClusterConfig)
 		if err != nil {
 			log.Print("Failed to read cluster config file")
 			log.Fatal(err)
 		}
-		if err := yaml.Unmarshal(clusterConfig, &cluster); err != nil {
-			log.Print("Failed to unmarshal cluster config")
+		clusterConfigJson, err := yaml.YAMLToJSON(clusterConfigYaml)
+		if err != nil {
+			log.Print("Failed to convert cluster config yaml to json")
+			log.Fatal(err)
+		}
+		if err := json.Unmarshal(clusterConfigJson, &cluster); err != nil {
+			log.Print("Failed to unmarshal cluster config json")
 			log.Fatal(err)
 		}
 
 		machine := infra.Machine{}
-		machineConfig, err := ioutil.ReadFile(MachineConfig)
+		machineConfigYaml, err := ioutil.ReadFile(MachineConfig)
 		if err != nil {
 			log.Print("Failed to read machine config file")
 			log.Fatal(err)
 		}
-		if err := yaml.Unmarshal(machineConfig, &machine); err != nil {
-			log.Print("Failed to unmarshal machine config")
+		machineConfigJson, err := yaml.YAMLToJSON(machineConfigYaml)
+		if err != nil {
+			log.Print("Failed to convert machine config yaml to json")
+			log.Fatal(err)
+		}
+		if err := json.Unmarshal(machineConfigJson, &machine); err != nil {
+			log.Print("Failed to unmarshal machine config json")
 			log.Fatal(err)
 		}
 
@@ -113,7 +125,10 @@ necessary infrastructure for a new cluster.`,
 		if err := aws.Get(&rt); err != nil {
 			log.Print("Failed to get route table")
 			log.Print("Deleting VPC that was created")
-			aws.Destroy(&vpc)
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
 			log.Fatal(err)
 		}
 		inv.Spec.RouteTableId = rt.Id
@@ -128,7 +143,10 @@ necessary infrastructure for a new cluster.`,
 		if err := aws.Provision(&subnet); err != nil {
 			log.Print("Failed to create subnet")
 			log.Print("Deleting VPC that was created")
-			aws.Destroy(&vpc)
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
 			log.Fatal(err)
 		}
 		inv.Spec.SubnetId = subnet.Id
@@ -143,8 +161,14 @@ necessary infrastructure for a new cluster.`,
 		if err := aws.Provision(&igw); err != nil {
 			log.Print("Failed to create internet gateway")
 			log.Print("Deleting infrastructure that was created")
-			aws.Destroy(&subnet)
-			aws.Destroy(&vpc)
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
 			log.Fatal(err)
 		}
 		inv.Spec.InternetGatewayId = igw.Id
@@ -160,13 +184,172 @@ necessary infrastructure for a new cluster.`,
 		if err := aws.Provision(&sg); err != nil {
 			log.Print("Failed to create security group")
 			log.Print("Deleting infrastructure that was created")
-			aws.Destroy(&igw)
-			aws.Destroy(&subnet)
-			aws.Destroy(&vpc)
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
 			log.Fatal(err)
 		}
 		inv.Spec.SecurityGroupId = sg.Id
 		log.Printf("Security group ID: %s", sg.Id)
+
+		log.Print("Creating S3 bucket...")
+		uuid, err := uuid.NewV4()
+		if err != nil {
+			log.Print("Failed to create a UUID for S3 bucket name")
+			log.Fatal(err)
+		}
+		bucket := aws.Bucket{
+			Region: cluster.Spec.Region,
+			Name:   fmt.Sprintf("%s-artifacts-%s", cluster.ObjectMeta.Name, uuid),
+		}
+		if err := aws.Provision(&bucket); err != nil {
+			log.Print("Failed to create s3 bucket")
+			log.Print("Deleting infrastructure that was created")
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
+			log.Fatal(err)
+		}
+		inv.Spec.BucketId = bucket.Name
+		log.Printf("S3 bucket name: %s", bucket.Name)
+
+		log.Print("Creating IAM policy...")
+		policy := aws.IamPolicy{
+			Region: cluster.Spec.Region,
+			Name:   fmt.Sprintf("%s-node-policy", cluster.ObjectMeta.Name),
+		}
+		if err := aws.Provision(&policy); err != nil {
+			log.Print("Failed to create IAM policy")
+			log.Print("Deleting infrastructure that was created")
+			if err := aws.Destroy(&bucket); err != nil {
+				log.Print("Failed to delete S3 bucket")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
+			log.Fatal(err)
+		}
+		inv.Spec.IamPolicyId = policy.Arn
+		log.Printf("IAM policy ID: %s", policy.Arn)
+
+		log.Print("Creating IAM role...")
+		role := aws.IamRole{
+			Region: cluster.Spec.Region,
+			Name:   fmt.Sprintf("%s-node-role", cluster.ObjectMeta.Name),
+			Policy: policy.Arn,
+		}
+		if err := aws.Provision(&role); err != nil {
+			log.Print("Failed to create IAM role")
+			log.Print("Deleting infrastructure that was created")
+			if err := aws.Destroy(&policy); err != nil {
+				log.Print("Failed to delete IAM policy")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&bucket); err != nil {
+				log.Print("Failed to delete S3 bucket")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
+			log.Fatal(err)
+		}
+		inv.Spec.IamRoleId = role.Name
+		log.Printf("IAM role ID: %s", role.Name)
+
+		log.Print("Creating instance profile...")
+		profile := aws.InstanceProfile{
+			Region: cluster.Spec.Region,
+			Name:   fmt.Sprintf("%s-profile", cluster.ObjectMeta.Name),
+			Role:   role.Name,
+		}
+		if err := aws.Provision(&profile); err != nil {
+			log.Print("Failed to create instance profile")
+			log.Print("Deleting infrastructure that was created")
+			if err := aws.Destroy(&role); err != nil {
+				log.Print("Failed to delete IAM role")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&policy); err != nil {
+				log.Print("Failed to delete IAM policy")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&bucket); err != nil {
+				log.Print("Failed to delete S3 bucket")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
+			log.Fatal(err)
+		}
+		inv.Spec.InstanceProfileId = profile.Name
+		log.Printf("Instance profile ID: %s", profile.Name)
+
+		log.Print("Waiting for instance profile to become ready...")
+		time.Sleep(time.Second * 10)
 
 		log.Print("Creating EC2 instance...")
 		instance := aws.Instance{
@@ -175,14 +358,45 @@ necessary infrastructure for a new cluster.`,
 			Region:          cluster.Spec.Region,
 			ImageId:         machine.Spec.Ami,
 			KeyName:         machine.Spec.KeyName,
+			ArtifactStore:   bucket.Name,
+			Name:            fmt.Sprintf("%s-%s", cluster.ObjectMeta.Name, machine.ObjectMeta.Name),
+			Profile:         profile.Arn,
 		}
 		if err := aws.Provision(&instance); err != nil {
 			log.Print("Failed to create EC2 instance")
 			log.Print("Deleting infrastructure that was created")
-			aws.Destroy(&sg)
-			aws.Destroy(&igw)
-			aws.Destroy(&subnet)
-			aws.Destroy(&vpc)
+			if err := aws.Destroy(&profile); err != nil {
+				log.Print("Failed to delete instance profile")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&role); err != nil {
+				log.Print("Failed to delete IAM role")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&policy); err != nil {
+				log.Print("Failed to delete IAM policy")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&bucket); err != nil {
+				log.Print("Failed to delete S3 bucket")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
 			log.Fatal(err)
 		}
 		inv.Spec.InstanceId = instance.Id
@@ -192,11 +406,34 @@ necessary infrastructure for a new cluster.`,
 		if err != nil {
 			log.Print("Failed to marshal inventory to json")
 			log.Print("Deleting infrastructure that was created")
-			aws.Destroy(&instance)
-			aws.Destroy(&sg)
-			aws.Destroy(&igw)
-			aws.Destroy(&subnet)
-			aws.Destroy(&vpc)
+			if err := aws.Destroy(&profile); err != nil {
+				log.Print("Failed to delete instance profile")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&role); err != nil {
+				log.Print("Failed to delete IAM role")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&bucket); err != nil {
+				log.Print("Failed to delete S3 bucket")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
 			log.Fatal(err)
 		}
 

@@ -1,10 +1,10 @@
 # aws-infra-controller
 
-The aws-infra-controller manages the AWS infrastructure for your Kubernetes cluster for you.
+The aws-infra-controller manages the AWS infrastructure of your Kubernetes cluster for you.
 
 ## Status
 
-This project is pre-alpha.  The instructions below will spin up a single-node Kubernetes cluster in AWS but no useful infra management functionality has been developed yet.
+This project is a proof-of-concept work in progress.  The instructions below will spin up a single-node Kubernetes cluster in AWS but more useful infra management functionality is still in development.
 
 ## Prerequisites
 

@@ -77,7 +77,7 @@ cluster.`,
 			Region: inv.Spec.Region,
 		}
 		if err := aws.Destroy(&instance); err != nil {
-			log.Print("Failed to delete instance")
+			log.Print("Failed to delete EC2 instance")
 			log.Fatal(err)
 		}
 
@@ -91,6 +91,52 @@ cluster.`,
 			log.Print(".")
 		}
 		log.Print("EC2 instance terminated")
+
+		log.Print("Deleting instance profile...")
+		log.Printf("Instance profile ID: %s", inv.Spec.InstanceProfileId)
+		profile := aws.InstanceProfile{
+			Name:   inv.Spec.InstanceProfileId,
+			Region: inv.Spec.Region,
+			Role:   inv.Spec.IamRoleId,
+		}
+		if err := aws.Destroy(&profile); err != nil {
+			log.Print("Failed to delete instance profile")
+			log.Fatal(err)
+		}
+
+		log.Print("Deleting IAM role...")
+		log.Printf("IAM role ID: %s", inv.Spec.IamRoleId)
+		role := aws.IamRole{
+			Name:   inv.Spec.IamRoleId,
+			Policy: inv.Spec.IamPolicyId,
+			Region: inv.Spec.Region,
+		}
+		if err := aws.Destroy(&role); err != nil {
+			log.Print("Failed to delete IAM role")
+			log.Fatal(err)
+		}
+
+		log.Print("Deleting IAM policy...")
+		log.Printf("IAM policy ID: %s", inv.Spec.IamPolicyId)
+		policy := aws.IamPolicy{
+			Arn:    inv.Spec.IamPolicyId,
+			Region: inv.Spec.Region,
+		}
+		if err := aws.Destroy(&policy); err != nil {
+			log.Print("Failed to delete IAM policy")
+			log.Fatal(err)
+		}
+
+		log.Print("Deleting S3 bucket...")
+		log.Printf("Bucket name: %s", inv.Spec.BucketId)
+		bucket := aws.Bucket{
+			Name:   inv.Spec.BucketId,
+			Region: inv.Spec.Region,
+		}
+		if err := aws.Destroy(&bucket); err != nil {
+			log.Print("Failed to delete S3 budket")
+			log.Fatal(err)
+		}
 
 		log.Print("Deleting security group...")
 		log.Printf("Security group ID: %s", inv.Spec.SecurityGroupId)

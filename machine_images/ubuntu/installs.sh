@@ -17,8 +17,7 @@ rm -rf etcd-$ETCD_VERSION-linux-amd64*
 
 sudo mv /tmp/bootctl /usr/local/bin/
 sudo chmod +x /usr/local/bin/bootctl
-sudo mv /tmp/bootctl.service /etc/systemd/system/bootctl.service
-sudo systemctl enable bootctl
 
-sudo mv /tmp/network.yaml /etc/kubernetes/manifests/
+sudo mkdir -p /etc/kubernetes/network
+sudo mv /tmp/network.yaml /etc/kubernetes/network/
 

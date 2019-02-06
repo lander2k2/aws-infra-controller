@@ -29,3 +29,24 @@ func Destroy(i Infra) error {
 	}
 	return nil
 }
+
+type Artifact interface {
+	Put() error
+	Get() error
+}
+
+func Deposit(a Artifact) error {
+	err := a.Put()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func Retrieve(a Artifact) error {
+	err := a.Get()
+	if err != nil {
+		return err
+	}
+	return nil
+}

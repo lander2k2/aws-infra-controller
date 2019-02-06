@@ -28,7 +28,13 @@ spec:
           type: object
         spec:
           properties:
+            bucketId:
+              type: string
+            iamRoleId:
+              type: string
             instanceId:
+              type: string
+            instanceProfileId:
               type: string
             internetGatewayId:
               type: string
@@ -51,6 +57,9 @@ spec:
           - subnetId
           - internetGatewayId
           - securityGroupId
+          - bucketId
+          - iamRoleId
+          - instanceProfileId
           - instanceId
           type: object
         status:
