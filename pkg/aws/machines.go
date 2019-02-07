@@ -1,9 +1,6 @@
 package aws
 
 import (
-	"encoding/base64"
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -19,8 +16,8 @@ type Instance struct {
 	ImageId         string
 	KeyName         string
 	Status          string
-	ArtifactStore   string
 	Profile         string
+	Userdata        string
 }
 
 type IamPolicy struct {
@@ -45,19 +42,13 @@ type InstanceProfile struct {
 func (instance *Instance) Create() error {
 	svc := ec2.New(session.New(&aws.Config{Region: aws.String(instance.Region)}))
 
-	userdata := base64.StdEncoding.EncodeToString([]byte(
-		fmt.Sprintf("#!/bin/bash\r\nbootctl boot -a %s -r %s",
-			instance.ArtifactStore, instance.Region,
-		),
-	))
-
 	reply, err := svc.RunInstances(&ec2.RunInstancesInput{
 		ImageId:      aws.String(instance.ImageId),
 		InstanceType: aws.String("t2.medium"),
 		MinCount:     aws.Int64(1),
 		MaxCount:     aws.Int64(1),
 		KeyName:      aws.String(instance.KeyName),
-		UserData:     aws.String(userdata),
+		UserData:     aws.String(instance.Userdata),
 		NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{
 			&ec2.InstanceNetworkInterfaceSpecification{
 				DeviceIndex:              aws.Int64(0),

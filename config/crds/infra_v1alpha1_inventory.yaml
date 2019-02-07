@@ -30,6 +30,8 @@ spec:
           properties:
             bucketId:
               type: string
+            iamPolicyId:
+              type: string
             iamRoleId:
               type: string
             instanceId:
@@ -58,6 +60,7 @@ spec:
           - internetGatewayId
           - securityGroupId
           - bucketId
+          - iamPolicyId
           - iamRoleId
           - instanceProfileId
           - instanceId

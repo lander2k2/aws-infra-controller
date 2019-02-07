@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -29,6 +30,8 @@ import (
 var (
 	Region    string
 	Artifacts string
+	Cluster   string
+	Machine   string
 )
 
 // bootCmd represents the boot command
@@ -95,9 +98,36 @@ start the infrastructure controller.`,
 			"apply", "-f", "/etc/kubernetes/network/network.yaml").CombinedOutput()
 		if err != nil {
 			log.Print("Failed to deploy pod network provider")
-			log.Fatal(err)
+			log.Fatal(err, string(netOut))
 		}
 		log.Print(string(netOut))
+
+		log.Print("Deploying infra controller...")
+		infraOut, err := exec.Command("/usr/bin/kubectl", "--kubeconfig", "/etc/kubernetes/admin.conf",
+			"apply", "-f", "/etc/kubernetes/infra/infra.yaml").CombinedOutput()
+		if err != nil {
+			log.Print("Failed to deploy infra controller")
+			log.Fatal(err, string(infraOut))
+		}
+		log.Print(string(infraOut))
+
+		log.Print("Creating cluster resource...")
+		clusterCmd := fmt.Sprintf("/bin/echo '%s' | /usr/bin/kubectl --kubeconfig /etc/kubernetes/admin.conf create -f -", Cluster)
+		clusterOut, err := exec.Command("/bin/bash", "-c", clusterCmd).CombinedOutput()
+		if err != nil {
+			log.Print("Failed to create cluster resource")
+			log.Fatal(err, string(clusterOut))
+		}
+		log.Print(string(clusterOut))
+
+		log.Print("Creating machine resource...")
+		machineCmd := fmt.Sprintf("/bin/echo '%s' | /usr/bin/kubectl --kubeconfig /etc/kubernetes/admin.conf create -f -", Machine)
+		machineOut, err := exec.Command("/bin/bash", "-c", machineCmd).CombinedOutput()
+		if err != nil {
+			log.Print("Failed to create machine resource")
+			log.Fatal(err, string(machineOut))
+		}
+		log.Print(string(machineOut))
 
 		log.Print("Creating kubeadm join token...")
 		tokenOut, err := exec.Command("/usr/bin/kubeadm", "token", "create", "--print-join-command").CombinedOutput()
@@ -134,4 +164,6 @@ func init() {
 	// bootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	bootCmd.Flags().StringVarP(&Artifacts, "artifacts", "a", "", "Artifacts store")
 	bootCmd.Flags().StringVarP(&Region, "region", "r", "", "AWS region")
+	bootCmd.Flags().StringVarP(&Cluster, "cluster", "c", "", "Cluster manifest")
+	bootCmd.Flags().StringVarP(&Machine, "machine", "m", "", "Machine manifest")
 }

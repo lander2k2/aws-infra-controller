@@ -28,6 +28,11 @@
             "destination": "/tmp/network.yaml"
         },
         {
+            "type": "file",
+            "source": "machine_images/ubuntu/aws-infra-controller.yaml",
+            "destination": "/tmp/infra.yaml"
+        },
+        {
             "type": "shell",
             "script": "./machine_images/ubuntu/installs.sh"
         }

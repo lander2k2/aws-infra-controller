@@ -21,3 +21,6 @@ sudo chmod +x /usr/local/bin/bootctl
 sudo mkdir -p /etc/kubernetes/network
 sudo mv /tmp/network.yaml /etc/kubernetes/network/
 
+sudo mkdir -p /etc/kubernetes/infra
+sudo mv /tmp/infra.yaml /etc/kubernetes/infra/
+

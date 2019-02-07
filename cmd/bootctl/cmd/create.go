@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -349,18 +350,24 @@ necessary infrastructure for a new cluster.`,
 		log.Printf("Instance profile ID: %s", profile.Name)
 
 		log.Print("Waiting for instance profile to become ready...")
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 15)
 
 		log.Print("Creating EC2 instance...")
+		userdata := base64.StdEncoding.EncodeToString([]byte(
+			fmt.Sprintf("#!/bin/bash\r\nbootctl boot -a %s -r %s -c '%s' -m '%s'",
+				bucket.Name, cluster.Spec.Region,
+				string(clusterConfigJson), string(machineConfigJson),
+			),
+		))
 		instance := aws.Instance{
 			SubnetId:        subnet.Id,
 			SecurityGroupId: sg.Id,
 			Region:          cluster.Spec.Region,
 			ImageId:         machine.Spec.Ami,
 			KeyName:         machine.Spec.KeyName,
-			ArtifactStore:   bucket.Name,
 			Name:            fmt.Sprintf("%s-%s", cluster.ObjectMeta.Name, machine.ObjectMeta.Name),
 			Profile:         profile.Arn,
+			Userdata:        userdata,
 		}
 		if err := aws.Provision(&instance); err != nil {
 			log.Print("Failed to create EC2 instance")
