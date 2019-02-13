@@ -47,18 +47,21 @@ Build the machine images for the bootstrap master and worker nodes.  Take note o
 ## Edit Machine Configs
 
 Set the following in `config/samples/boot-master-machine.yaml`:
-    * `spec.ami`: add the AMI from the boot machine image you built in the previous section
-    * `spec.keyName`: the name of a key pair in AWS you can use.
+
+* `spec.ami`: add the AMI from the boot machine image you built in the previous section
+* `spec.keyName`: the name of a key pair in AWS you can use.
 
 Set the following in `config/samples/worker-machine.yaml`:
-    * `spec.ami`: add the AMI from the worker machine image you built in the previous section
-    * `spec.keyName`: the name of a key pair in AWS you can use.
+
+* `spec.ami`: add the AMI from the worker machine image you built in the previous section
+* `spec.keyName`: the name of a key pair in AWS you can use.
 
 ## Edit Cluster Config
 
 Set the following in `config/samples/cluster.yaml`:
-    * `metadata.name`: arbitrary name you will recognize for your cluster
-    * `spec.region`: your preferred AWS region.  Use the same region you put in the `AWS_REGION` environment variable.
+
+* `metadata.name`: arbitrary name you will recognize for your cluster
+* `spec.region`: your preferred AWS region.  Use the same region you put in the `AWS_REGION` environment variable.
 
 ## Build bootctl utility
 
