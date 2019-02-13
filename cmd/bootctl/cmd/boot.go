@@ -32,6 +32,7 @@ var (
 	Artifacts string
 	Cluster   string
 	Machine   string
+	Secret    string
 )
 
 // bootCmd represents the boot command
@@ -102,6 +103,15 @@ start the infrastructure controller.`,
 		}
 		log.Print(string(netOut))
 
+		log.Print("Create AWS credentials secret...")
+		secretCmd := fmt.Sprintf("/bin/echo '%s' | /usr/bin/kubectl --kubeconfig /etc/kubernetes/admin.conf create -f -", Secret)
+		secretOut, err := exec.Command("/bin/bash", "-c", secretCmd).CombinedOutput()
+		if err != nil {
+			log.Print("Failed to create AWS credentials secret")
+			log.Fatal(err, string(secretOut))
+		}
+		log.Print(string(secretOut))
+
 		log.Print("Deploying infra controller...")
 		infraOut, err := exec.Command("/usr/bin/kubectl", "--kubeconfig", "/etc/kubernetes/admin.conf",
 			"apply", "-f", "/etc/kubernetes/infra/infra.yaml").CombinedOutput()
@@ -153,17 +163,9 @@ start the infrastructure controller.`,
 func init() {
 	rootCmd.AddCommand(bootCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// bootCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// bootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	bootCmd.Flags().StringVarP(&Artifacts, "artifacts", "a", "", "Artifacts store")
 	bootCmd.Flags().StringVarP(&Region, "region", "r", "", "AWS region")
 	bootCmd.Flags().StringVarP(&Cluster, "cluster", "c", "", "Cluster manifest")
 	bootCmd.Flags().StringVarP(&Machine, "machine", "m", "", "Machine manifest")
+	bootCmd.Flags().StringVarP(&Secret, "secret", "s", "", "AWS credentials secret")
 }

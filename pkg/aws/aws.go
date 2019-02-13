@@ -3,6 +3,7 @@ package aws
 type Infra interface {
 	Create() error
 	Describe() error
+	List() error
 	Delete() error
 }
 
@@ -16,6 +17,14 @@ func Provision(i Infra) error {
 
 func Get(i Infra) error {
 	err := i.Describe()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetAll(i Infra) error {
+	err := i.List()
 	if err != nil {
 		return err
 	}

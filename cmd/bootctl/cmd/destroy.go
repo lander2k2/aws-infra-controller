@@ -103,12 +103,52 @@ cluster.`,
 			log.Print("Failed to delete instance profile")
 			log.Fatal(err)
 		}
+		log.Print("Instance profile deleted")
+
+		log.Print("Deleting IAM infra user...")
+		log.Printf("User name: %s", inv.Spec.IamUserId)
+		user := aws.IamUser{
+			Name:        inv.Spec.IamUserId,
+			Region:      inv.Spec.Region,
+			AccessKeyId: inv.Spec.AccessKeyId,
+			Group:       inv.Spec.IamGroupId,
+		}
+		if err := aws.Destroy(&user); err != nil {
+			log.Print("Failed to delete IAM infra user")
+			log.Fatal(err)
+		}
+		log.Print("IAM infra user deleted")
+
+		log.Print("Deleting IAM infra group...")
+		log.Printf("Group name: %s", inv.Spec.IamGroupId)
+		group := aws.IamGroup{
+			Name:   inv.Spec.IamGroupId,
+			Region: inv.Spec.Region,
+			Policy: inv.Spec.InfraControllerIamPolicyId,
+		}
+		if err := aws.Destroy(&group); err != nil {
+			log.Print("Failed to delete IAM infra group")
+			log.Fatal(err)
+		}
+		log.Print("IAM infra group deleted")
+
+		log.Print("Deleting IAM infra policy...")
+		log.Printf("IAM policy ID: %s", inv.Spec.InfraControllerIamPolicyId)
+		infraPolicy := aws.IamPolicy{
+			Arn:    inv.Spec.InfraControllerIamPolicyId,
+			Region: inv.Spec.Region,
+		}
+		if err := aws.Destroy(&infraPolicy); err != nil {
+			log.Print("Failed to delete IAM infra policy")
+			log.Fatal(err)
+		}
+		log.Print("IAM infra policy deleted")
 
 		log.Print("Deleting IAM role...")
 		log.Printf("IAM role ID: %s", inv.Spec.IamRoleId)
 		role := aws.IamRole{
 			Name:   inv.Spec.IamRoleId,
-			Policy: inv.Spec.IamPolicyId,
+			Policy: inv.Spec.MasterNodeIamPolicyId,
 			Region: inv.Spec.Region,
 		}
 		if err := aws.Destroy(&role); err != nil {
@@ -116,14 +156,14 @@ cluster.`,
 			log.Fatal(err)
 		}
 
-		log.Print("Deleting IAM policy...")
-		log.Printf("IAM policy ID: %s", inv.Spec.IamPolicyId)
-		policy := aws.IamPolicy{
-			Arn:    inv.Spec.IamPolicyId,
+		log.Print("Deleting IAM master node policy...")
+		log.Printf("IAM policy ID: %s", inv.Spec.MasterNodeIamPolicyId)
+		nodePolicy := aws.IamPolicy{
+			Arn:    inv.Spec.MasterNodeIamPolicyId,
 			Region: inv.Spec.Region,
 		}
-		if err := aws.Destroy(&policy); err != nil {
-			log.Print("Failed to delete IAM policy")
+		if err := aws.Destroy(&nodePolicy); err != nil {
+			log.Print("Failed to delete IAM master node policy")
 			log.Fatal(err)
 		}
 
@@ -190,14 +230,5 @@ cluster.`,
 func init() {
 	rootCmd.AddCommand(destroyCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// destroyCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// destroyCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	destroyCmd.Flags().StringVarP(&InventoryConfig, "inventory-config", "i", "", "Inventory configuration file")
 }

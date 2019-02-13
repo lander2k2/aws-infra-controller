@@ -27,6 +27,8 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/nu7hatch/gouuid"
 	"github.com/spf13/cobra"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	infra "github.com/lander2k2/aws-infra-controller/pkg/apis/infra/v1alpha1"
 	"github.com/lander2k2/aws-infra-controller/pkg/aws"
@@ -71,6 +73,7 @@ necessary infrastructure for a new cluster.`,
 			log.Fatal(err)
 		}
 
+		// load cluster config
 		cluster := infra.Cluster{}
 		clusterConfigYaml, err := ioutil.ReadFile(ClusterConfig)
 		if err != nil {
@@ -87,6 +90,7 @@ necessary infrastructure for a new cluster.`,
 			log.Fatal(err)
 		}
 
+		// load machine config
 		machine := infra.Machine{}
 		machineConfigYaml, err := ioutil.ReadFile(MachineConfig)
 		if err != nil {
@@ -103,9 +107,20 @@ necessary infrastructure for a new cluster.`,
 			log.Fatal(err)
 		}
 
-		inv := infra.Inventory{}
+		// create inventory
+		inv := infra.Inventory{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Inventory",
+				APIVersion: "infra.lander2k2.com/v1alpha1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-inventory", cluster.ObjectMeta.Name),
+				Namespace: "kube-system",
+			},
+		}
 		inv.Spec.Region = cluster.Spec.Region
 
+		// create VPC
 		log.Print("Creating VPC...")
 		vpc := aws.Vpc{
 			Cidr:   "10.0.0.0/16",
@@ -118,6 +133,7 @@ necessary infrastructure for a new cluster.`,
 		inv.Spec.VpcId = vpc.Id
 		log.Printf("VPC ID: %s", vpc.Id)
 
+		// get route table ID
 		log.Print("Getting route table...")
 		rt := aws.RouteTable{
 			VpcId:  vpc.Id,
@@ -135,6 +151,7 @@ necessary infrastructure for a new cluster.`,
 		inv.Spec.RouteTableId = rt.Id
 		log.Printf("Route table ID: %s", rt.Id)
 
+		// create subnet
 		log.Print("Creating subnet...")
 		subnet := aws.Subnet{
 			VpcId:  vpc.Id,
@@ -153,6 +170,7 @@ necessary infrastructure for a new cluster.`,
 		inv.Spec.SubnetId = subnet.Id
 		log.Printf("Subnet ID: %s", subnet.Id)
 
+		// create internet gateway
 		log.Print("Creating internet gateway...")
 		igw := aws.InternetGateway{
 			VpcId:        vpc.Id,
@@ -175,6 +193,7 @@ necessary infrastructure for a new cluster.`,
 		inv.Spec.InternetGatewayId = igw.Id
 		log.Printf("Internet gateway ID: %s", igw.Id)
 
+		// create security group
 		log.Print("Creating security group...")
 		sg := aws.SecurityGroup{
 			VpcId:       vpc.Id,
@@ -202,6 +221,7 @@ necessary infrastructure for a new cluster.`,
 		inv.Spec.SecurityGroupId = sg.Id
 		log.Printf("Security group ID: %s", sg.Id)
 
+		// create S3 bucket
 		log.Print("Creating S3 bucket...")
 		uuid, err := uuid.NewV4()
 		if err != nil {
@@ -236,13 +256,15 @@ necessary infrastructure for a new cluster.`,
 		inv.Spec.BucketId = bucket.Name
 		log.Printf("S3 bucket name: %s", bucket.Name)
 
-		log.Print("Creating IAM policy...")
+		// create IAM policy for master node
+		log.Print("Creating master node IAM policy...")
 		policy := aws.IamPolicy{
 			Region: cluster.Spec.Region,
 			Name:   fmt.Sprintf("%s-node-policy", cluster.ObjectMeta.Name),
+			Type:   "machine",
 		}
 		if err := aws.Provision(&policy); err != nil {
-			log.Print("Failed to create IAM policy")
+			log.Print("Failed to create master node IAM policy")
 			log.Print("Deleting infrastructure that was created")
 			if err := aws.Destroy(&bucket); err != nil {
 				log.Print("Failed to delete S3 bucket")
@@ -266,9 +288,10 @@ necessary infrastructure for a new cluster.`,
 			}
 			log.Fatal(err)
 		}
-		inv.Spec.IamPolicyId = policy.Arn
-		log.Printf("IAM policy ID: %s", policy.Arn)
+		inv.Spec.MasterNodeIamPolicyId = policy.Arn
+		log.Printf("Master node IAM policy ID: %s", policy.Arn)
 
+		// create IAM role for master node
 		log.Print("Creating IAM role...")
 		role := aws.IamRole{
 			Region: cluster.Spec.Region,
@@ -307,6 +330,147 @@ necessary infrastructure for a new cluster.`,
 		inv.Spec.IamRoleId = role.Name
 		log.Printf("IAM role ID: %s", role.Name)
 
+		// create IAM policy for infra controller
+		log.Print("Creating infra controller IAM policy...")
+		infraPolicy := aws.IamPolicy{
+			Region: cluster.Spec.Region,
+			Name:   fmt.Sprintf("%s-infra-policy", cluster.ObjectMeta.Name),
+			Type:   "infraController",
+		}
+		if err := aws.Provision(&infraPolicy); err != nil {
+			log.Print("Failed to create infra controller IAM policy")
+			log.Print("Deleting infrastructure that was created")
+			if err := aws.Destroy(&role); err != nil {
+				log.Print("Failed to delete IAM role")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&policy); err != nil {
+				log.Print("Failed to delete IAM policy")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&bucket); err != nil {
+				log.Print("Failed to delete S3 bucket")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
+			log.Fatal(err)
+		}
+		inv.Spec.InfraControllerIamPolicyId = infraPolicy.Arn
+		log.Printf("Infra IAM policy ID: %s", infraPolicy.Arn)
+
+		// create IAM group and attach policy
+		group := aws.IamGroup{
+			Region: cluster.Spec.Region,
+			Name:   fmt.Sprintf("%s-infra-group", cluster.ObjectMeta.Name),
+			Policy: infraPolicy.Arn,
+		}
+		if err := aws.Provision(&group); err != nil {
+			log.Print("Failed to create infra controller group")
+			log.Print("Deleting infrastructure that was created")
+			if err := aws.Destroy(&infraPolicy); err != nil {
+				log.Print("Failed to delete infra controller IAM policy")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&role); err != nil {
+				log.Print("Failed to delete IAM role")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&policy); err != nil {
+				log.Print("Failed to delete IAM policy")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&bucket); err != nil {
+				log.Print("Failed to delete S3 bucket")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
+			log.Fatal(err)
+		}
+		inv.Spec.IamGroupId = group.Name
+		log.Printf("IAM group name: %s", group.Name)
+
+		// create IAM user and create access key
+		user := aws.IamUser{
+			Region: cluster.Spec.Region,
+			Name:   fmt.Sprintf("%s-infra-user", cluster.ObjectMeta.Name),
+			Group:  group.Name,
+		}
+		if err := aws.Provision(&user); err != nil {
+			log.Print("Failed to create infra controller user")
+			log.Print("Deleting infrastructure that was created")
+			if err := aws.Destroy(&group); err != nil {
+				log.Print("Failed to delete IAM group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&infraPolicy); err != nil {
+				log.Print("Failed to delete infra controller IAM policy")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&role); err != nil {
+				log.Print("Failed to delete IAM role")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&policy); err != nil {
+				log.Print("Failed to delete IAM policy")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&bucket); err != nil {
+				log.Print("Failed to delete S3 bucket")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&sg); err != nil {
+				log.Print("Failed to delete security group")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&igw); err != nil {
+				log.Print("Failed to delete internet gateway")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&subnet); err != nil {
+				log.Print("Failed to delete subnet")
+				log.Print(err)
+			}
+			if err := aws.Destroy(&vpc); err != nil {
+				log.Print("Failed to delete VPC")
+				log.Print(err)
+			}
+			log.Fatal(err)
+		}
+		inv.Spec.IamUserId = user.Name
+		inv.Spec.AccessKeyId = user.AccessKeyId
+		log.Printf("IAM user name: %s", user.Name)
+
+		// create EC2 instance profile
 		log.Print("Creating instance profile...")
 		profile := aws.InstanceProfile{
 			Region: cluster.Spec.Region,
@@ -349,25 +513,50 @@ necessary infrastructure for a new cluster.`,
 		inv.Spec.InstanceProfileId = profile.Name
 		log.Printf("Instance profile ID: %s", profile.Name)
 
-		log.Print("Waiting for instance profile to become ready...")
+		// instance profile seems to take a few seconds to become available
+		log.Print("Pausing to let instance profile become ready...")
 		time.Sleep(time.Second * 15)
+
+		// create secret with AWS access credentials for infra controller
+		secret := &v1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "aws-creds",
+				Namespace: "kube-system",
+			},
+			Data: map[string][]byte{
+				"aws_access_key_id":     []byte(user.AccessKeyId),
+				"aws_secret_access_key": []byte(user.SecretAccessKey),
+			},
+		}
+		secretJson, err := json.Marshal(secret)
+		if err != nil {
+			log.Println("Failed to marshal secret json")
+			log.Fatal(err)
+		}
 
 		log.Print("Creating EC2 instance...")
 		userdata := base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("#!/bin/bash\r\nbootctl boot -a %s -r %s -c '%s' -m '%s'",
+			fmt.Sprintf("#!/bin/bash\r\nbootctl boot -a %s -r %s -c '%s' -m '%s' -s '%s'",
 				bucket.Name, cluster.Spec.Region,
-				string(clusterConfigJson), string(machineConfigJson),
+				string(clusterConfigJson), string(machineConfigJson), string(secretJson),
 			),
 		))
 		instance := aws.Instance{
 			SubnetId:        subnet.Id,
 			SecurityGroupId: sg.Id,
 			Region:          cluster.Spec.Region,
+			Cluster:         cluster.ObjectMeta.Name,
 			ImageId:         machine.Spec.Ami,
 			KeyName:         machine.Spec.KeyName,
 			Name:            fmt.Sprintf("%s-%s", cluster.ObjectMeta.Name, machine.ObjectMeta.Name),
-			Profile:         profile.Arn,
+			Profile:         profile.Name,
 			Userdata:        userdata,
+			MachineType:     machine.Spec.MachineType,
+			Replicas:        1,
 		}
 		if err := aws.Provision(&instance); err != nil {
 			log.Print("Failed to create EC2 instance")
@@ -451,15 +640,6 @@ necessary infrastructure for a new cluster.`,
 func init() {
 	rootCmd.AddCommand(createCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// createCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// createCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	createCmd.Flags().StringVarP(&ClusterConfig, "cluster-config", "c", "", "Cluster configuration file")
 	createCmd.Flags().StringVarP(&MachineConfig, "machine-config", "m", "", "Machine configuration file")
 }

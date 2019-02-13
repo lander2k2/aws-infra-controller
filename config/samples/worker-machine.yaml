@@ -1,0 +1,11 @@
+apiVersion: infra.lander2k2.com/v1alpha1
+kind: Machine
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: worker
+spec:
+  machineType: worker
+  ami: ami-087047362484e250b
+  keyName: dev-richard
+  replicas: 1

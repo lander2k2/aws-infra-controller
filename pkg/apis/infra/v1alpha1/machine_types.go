@@ -27,8 +27,10 @@ import (
 type MachineSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Ami     string `json:"ami"`
-	KeyName string `json:"keyName" yaml:"keyName"`
+	MachineType string `json:"machineType"`
+	Ami         string `json:"ami"`
+	KeyName     string `json:"keyName" yaml:"keyName"`
+	Replicas    int    `json:"replicas"`
 }
 
 // MachineStatus defines the observed state of Machine

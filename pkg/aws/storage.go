@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -32,6 +33,10 @@ func (bucket *Bucket) Create() error {
 }
 
 func (bucket *Bucket) Describe() error {
+	return nil
+}
+
+func (bucket *Bucket) List() error {
 	return nil
 }
 
@@ -86,5 +91,19 @@ func (object *Object) Put() error {
 }
 
 func (object *Object) Get() error {
+	svc := s3.New(session.New(&aws.Config{Region: aws.String(object.Region)}))
+
+	reply, err := svc.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(object.Location),
+		Key:    aws.String("join"),
+	})
+	if err != nil {
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(reply.Body)
+	object.Body = buf.String()
+
 	return nil
 }

@@ -28,17 +28,25 @@ spec:
           type: object
         spec:
           properties:
+            accessKeyId:
+              type: string
             bucketId:
               type: string
-            iamPolicyId:
+            iamGroupId:
               type: string
             iamRoleId:
+              type: string
+            iamUserId:
+              type: string
+            infraControllerIamPolicyId:
               type: string
             instanceId:
               type: string
             instanceProfileId:
               type: string
             internetGatewayId:
+              type: string
+            masterNodeIamPolicyId:
               type: string
             region:
               description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -60,8 +68,12 @@ spec:
           - internetGatewayId
           - securityGroupId
           - bucketId
-          - iamPolicyId
+          - masterNodeIamPolicyId
+          - infraControllerIamPolicyId
           - iamRoleId
+          - iamGroupId
+          - iamUserId
+          - accessKeyId
           - instanceProfileId
           - instanceId
           type: object

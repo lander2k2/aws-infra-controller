@@ -18,23 +18,21 @@ package machine
 
 import (
 	"context"
-	"reflect"
+	"encoding/base64"
+	"fmt"
 
-	infrav1alpha1 "github.com/lander2k2/aws-infra-controller/pkg/apis/infra/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	infrav1alpha1 "github.com/lander2k2/aws-infra-controller/pkg/apis/infra/v1alpha1"
+	"github.com/lander2k2/aws-infra-controller/pkg/aws"
 )
 
 var log = logf.Log.WithName("controller")
@@ -71,13 +69,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create
 	// Uncomment watch a Deployment created by Machine - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &infrav1alpha1.Machine{},
-	})
-	if err != nil {
-		return err
-	}
+	//err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+	//	IsController: true,
+	//	OwnerType:    &infrav1alpha1.Machine{},
+	//})
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }
@@ -99,10 +97,12 @@ type ReconcileMachine struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=infra.lander2k2.com,resources=machines,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=infra.lander2k2.com,resources=machines/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=infra.lander2k2.com,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=infra.lander2k2.com,resources=clusters/status,verbs=get;update;patch
 func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the Machine instance
-	instance := &infrav1alpha1.Machine{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	machineInstance := &infrav1alpha1.Machine{}
+	err := r.Get(context.TODO(), request.NamespacedName, machineInstance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -113,55 +113,84 @@ func (r *ReconcileMachine) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this to be the object type created by your controller
-	// Define the desired Deployment object
-	deploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-deployment",
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"deployment": instance.Name + "-deployment"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"deployment": instance.Name + "-deployment"}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx",
-						},
-					},
-				},
-			},
-		},
-	}
-	if err := controllerutil.SetControllerReference(instance, deploy, r.scheme); err != nil {
+	log.Info(fmt.Sprintf("Reconciling for machine %s, type %s", machineInstance.ObjectMeta.Name, machineInstance.Spec.MachineType))
+
+	listOpts := client.ListOptions{}
+	clusters := &infrav1alpha1.ClusterList{}
+	if err := r.List(context.Background(), &listOpts, clusters); err != nil {
+		log.Info("Failed to list clusters")
+		log.Info(err.Error())
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Check if the Deployment already exists
-	found := &appsv1.Deployment{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		log.Info("Creating Deployment", "namespace", deploy.Namespace, "name", deploy.Name)
-		err = r.Create(context.TODO(), deploy)
-		return reconcile.Result{}, err
-	} else if err != nil {
+	inventoryList := &infrav1alpha1.InventoryList{}
+	inv := infrav1alpha1.Inventory{}
+	if err := r.List(context.Background(), &listOpts, inventoryList); err != nil {
+		log.Info("Failed to list inventory")
+		log.Info(err.Error())
 		return reconcile.Result{}, err
 	}
+	if len(inventoryList.Items) < 1 {
+		log.Info("No inventory registered")
+	} else {
+		inv = inventoryList.Items[0]
+	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(deploy.Spec, found.Spec) {
-		found.Spec = deploy.Spec
-		log.Info("Updating Deployment", "namespace", deploy.Namespace, "name", deploy.Name)
-		err = r.Update(context.TODO(), found)
-		if err != nil {
-			return reconcile.Result{}, err
+	switch machineInstance.Spec.MachineType {
+	case "boot-master":
+		return reconcile.Result{}, nil
+	case "worker":
+		// get existing worker nodes
+		machine := aws.Instance{
+			Region:      clusters.Items[0].Spec.Region,
+			Cluster:     clusters.Items[0].ObjectMeta.Name,
+			MachineType: machineInstance.Spec.MachineType,
 		}
+		if err := aws.GetAll(&machine); err != nil {
+			fmt.Println("Failed to get machines")
+			fmt.Println(err)
+		}
+
+		switch {
+		case int64(machineInstance.Spec.Replicas) > machine.Replicas:
+			// provision new instance/s
+			count := int64(machineInstance.Spec.Replicas) - machine.Replicas
+			userdata := base64.StdEncoding.EncodeToString([]byte(
+				fmt.Sprintf("#!/bin/bash\r\nbootctl join -a %s -r %s",
+					inv.Spec.BucketId, clusters.Items[0].Spec.Region,
+				),
+			))
+			log.Info("More machines requested")
+			instance := aws.Instance{
+				SubnetId:        inv.Spec.SubnetId,
+				SecurityGroupId: inv.Spec.SecurityGroupId,
+				Region:          clusters.Items[0].Spec.Region,
+				Cluster:         clusters.Items[0].ObjectMeta.Name,
+				ImageId:         machineInstance.Spec.Ami,
+				KeyName:         machineInstance.Spec.KeyName,
+				Name:            fmt.Sprintf("%s-%s", clusters.Items[0].ObjectMeta.Name, machineInstance.ObjectMeta.Name),
+				Profile:         inv.Spec.InstanceProfileId,
+				Userdata:        userdata,
+				MachineType:     machineInstance.Spec.MachineType,
+				Replicas:        count,
+			}
+			if err := aws.Provision(&instance); err != nil {
+				log.Info("Failed to provision instance/s")
+				log.Info(err.Error())
+			}
+			// update inventory
+
+		case int64(machineInstance.Spec.Replicas) < machine.Replicas:
+			// destroy instance/s
+			log.Info("Fewer machines requested")
+			log.Info("Not implemented")
+		default:
+			log.Info("Desired number of machines running")
+		}
+
+		return reconcile.Result{}, nil
+	default:
+		log.Info(fmt.Sprintf("Do not recognize machine type %s", machineInstance.Spec.MachineType))
+		return reconcile.Result{}, nil
 	}
-	return reconcile.Result{}, nil
 }

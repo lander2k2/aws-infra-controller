@@ -59,6 +59,10 @@ func (vpc *Vpc) Describe() error {
 	return nil
 }
 
+func (vpc *Vpc) List() error {
+	return nil
+}
+
 func (vpc *Vpc) Delete() error {
 	svc := ec2.New(session.New(&aws.Config{Region: aws.String(vpc.Region)}))
 
@@ -95,6 +99,10 @@ func (rt *RouteTable) Describe() error {
 	return nil
 }
 
+func (rt *RouteTable) List() error {
+	return nil
+}
+
 func (rt *RouteTable) Delete() error {
 	return nil
 }
@@ -116,6 +124,10 @@ func (subnet *Subnet) Create() error {
 }
 
 func (subnet *Subnet) Describe() error {
+	return nil
+}
+
+func (subnet *Subnet) List() error {
 	return nil
 }
 
@@ -160,6 +172,10 @@ func (igw *InternetGateway) Create() error {
 }
 
 func (igw *InternetGateway) Describe() error {
+	return nil
+}
+
+func (igw *InternetGateway) List() error {
 	return nil
 }
 
@@ -222,6 +238,10 @@ func (sg *SecurityGroup) Create() error {
 }
 
 func (sg *SecurityGroup) Describe() error {
+	return nil
+}
+
+func (sg *SecurityGroup) List() error {
 	return nil
 }
 

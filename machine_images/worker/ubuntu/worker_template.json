@@ -1,0 +1,31 @@
+{
+    "builders": [
+        {
+            "type": "amazon-ebs",
+            "ami_name": "k8s-worker-{{timestamp}}",
+            "instance_type": "t2.micro",
+            "source_ami_filter": {
+                "filters": {
+                    "virtualization-type": "hvm",
+                    "name": "ubuntu/images/*ubuntu-bionic-18.04-amd64-server-*",
+                    "root-device-type": "ebs"
+                },
+                "owners": ["099720109477"],
+                "most_recent": true
+            },
+            "ssh_username": "ubuntu"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "file",
+            "source": "machine_images/worker/ubuntu/bootctl",
+            "destination": "/tmp/bootctl"
+        },
+        {
+            "type": "shell",
+            "script": "./machine_images/worker/ubuntu/installs.sh"
+        }
+    ]
+}
+

@@ -27,17 +27,21 @@ import (
 type InventorySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Region            string `json:"region"`
-	VpcId             string `json:"vpcId"`
-	RouteTableId      string `json:"routeTableId"`
-	SubnetId          string `json:"subnetId"`
-	InternetGatewayId string `json:"internetGatewayId"`
-	SecurityGroupId   string `json:"securityGroupId"`
-	BucketId          string `json:"bucketId"`
-	IamPolicyId       string `json:"iamPolicyId"`
-	IamRoleId         string `json:"iamRoleId"`
-	InstanceProfileId string `json:"instanceProfileId"`
-	InstanceId        string `json:"instanceId"`
+	Region                     string `json:"region"`
+	VpcId                      string `json:"vpcId"`
+	RouteTableId               string `json:"routeTableId"`
+	SubnetId                   string `json:"subnetId"`
+	InternetGatewayId          string `json:"internetGatewayId"`
+	SecurityGroupId            string `json:"securityGroupId"`
+	BucketId                   string `json:"bucketId"`
+	MasterNodeIamPolicyId      string `json:"masterNodeIamPolicyId"`
+	InfraControllerIamPolicyId string `json:"infraControllerIamPolicyId"`
+	IamRoleId                  string `json:"iamRoleId"`
+	IamGroupId                 string `json:"iamGroupId"`
+	IamUserId                  string `json:"iamUserId"`
+	AccessKeyId                string `json:"accessKeyId"`
+	InstanceProfileId          string `json:"instanceProfileId"`
+	InstanceId                 string `json:"instanceId"`
 }
 
 // InventoryStatus defines the observed state of Inventory

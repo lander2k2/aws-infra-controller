@@ -19,22 +19,22 @@
     "provisioners": [
         {
             "type": "file",
-            "source": "machine_images/ubuntu/bootctl",
+            "source": "machine_images/boot/ubuntu/bootctl",
             "destination": "/tmp/bootctl"
         },
         {
             "type": "file",
-            "source": "machine_images/ubuntu/network.yaml",
+            "source": "machine_images/boot/ubuntu/network.yaml",
             "destination": "/tmp/network.yaml"
         },
         {
             "type": "file",
-            "source": "machine_images/ubuntu/aws-infra-controller.yaml",
+            "source": "machine_images/boot/ubuntu/aws-infra-controller.yaml",
             "destination": "/tmp/infra.yaml"
         },
         {
             "type": "shell",
-            "script": "./machine_images/ubuntu/installs.sh"
+            "script": "./machine_images/boot/ubuntu/installs.sh"
         }
     ]
 }
