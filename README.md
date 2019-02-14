@@ -2,6 +2,10 @@
 
 The aws-infra-controller manages the AWS infrastructure of your Kubernetes cluster for you.
 
+## How It Works
+
+![aws-infra-controller](docs/aws-infra-controller.png)
+
 ## Status
 
 This project is a proof-of-concept work in progress.  The instructions below will spin up a single-node Kubernetes cluster in AWS and allow you to add worker machines but more useful infra management functionality is still in development.
@@ -63,7 +67,7 @@ Set the following in `config/samples/cluster.yaml`:
 * `metadata.name`: arbitrary name you will recognize for your cluster
 * `spec.region`: your preferred AWS region.  Use the same region you put in the `AWS_REGION` environment variable.
 
-## Build bootctl utility
+## Build bootctl Utility
 
     $ make bootctl
 
@@ -79,6 +83,8 @@ Run the create command with cluster and machine flags, write output to an invent
 Note: do not overwrite or delete the `~/.aws-infra-controller-inventory.json` file until you have deleted your cluster.  The `destroy` command references it to determine which infrastructure to tear down.
 
 ## Connect to Cluster
+
+Note: the following steps will be streamlined when functionality is added to retrieve a kubeconfig for interaction with the cluster.  It will elliminate the need to connect via ssh.
 
 Wait a couple of minutes for the EC2 instance to spin up and the Kubernetes cluster to initialize.
 
