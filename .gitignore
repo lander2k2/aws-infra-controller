@@ -23,5 +23,7 @@ bin
 *.swo
 *~
 
-bootctl
+bin/bootctl
+machine_images/boot/ubuntu/bootctl
+machine_images/worker/ubuntu/bootctl
 .envrc

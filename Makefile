@@ -65,5 +65,5 @@ worker-machine-image:
 
 # Build bootctl
 bootctl:
-	go build -o bootctl cmd/bootctl/main.go
+	go build -o bin/bootctl cmd/bootctl/main.go
 
