@@ -229,6 +229,13 @@ func (sg *SecurityGroup) Create() error {
 				SetIpRanges([]*ec2.IpRange{
 					{CidrIp: aws.String("0.0.0.0/0")},
 				}),
+			(&ec2.IpPermission{}).
+				SetIpProtocol("-1").
+				SetFromPort(0).
+				SetToPort(0).
+				SetIpRanges([]*ec2.IpRange{
+					{CidrIp: aws.String("10.0.0.0/16")},
+				}),
 		},
 	}); err != nil {
 		return err
