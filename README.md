@@ -25,7 +25,14 @@ This project does not address multi-cluster concerns at all and so is narrower i
 * [packer](https://www.packer.io/)
 * have an AWS account with credentials for API access
 
-## Put your AWS security credentials in your environment
+## Get Code
+
+    $ go get github.com/lander2k2/aws-infra-controller
+    $ cd $GOPATH/src/github.com/lander2k2/aws-infra-controller
+
+## Make AWS Credentials Available
+
+You can put the credentials in your environment as follows or use another method that you prefer.
 
     $ export AWS_ACCESS_KEY_ID=[your access key ID]
     $ export AWS_SECRET_ACCESS_KEY=[your secret access key]
