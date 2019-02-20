@@ -95,6 +95,10 @@ Note: the following steps will be streamlined when functionality is added to ret
 
 Wait a couple of minutes for the EC2 instance to spin up and the Kubernetes cluster to initialize.
 
+Add the private key identity for your AWS key pair to the auth agent.
+
+    $ ssh-add [path/to/private/key]
+
 Get the master node's IP address from AWS.  Then copy some configs to the EC2 instance.
 
     $ scp ~/.aws-infra-controller-inventory.json ubuntu@[ip address]:~/aws-infra-controller-inventory.json
