@@ -2,6 +2,8 @@
 
 The aws-infra-controller manages the AWS infrastructure of your Kubernetes cluster for you.
 
+The design goals for this project are laid out in more detail [here](https://github.com/lander2k2/aws-infra-controller/blob/master/docs/design_goals.md).
+
 ## How It Works
 
 ![aws-infra-controller](docs/aws-infra-controller.png)
@@ -22,6 +24,7 @@ This project does not address multi-cluster concerns at all and so is narrower i
 
 * [go](https://golang.org/)
 * [docker](https://docs.docker.com/install/)
+* [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder/releases)
 * [packer](https://www.packer.io/)
 * have an AWS account with credentials for API access
 

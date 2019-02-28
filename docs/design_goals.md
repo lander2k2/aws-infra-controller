@@ -24,16 +24,20 @@ Extending the Kubernetes API with Cluster and Machine resources is an excellent 
 
 Do not venture into multi-cluster management territory.  Leave multi-cluster to the federation project/s.  Multi-cluster is an important concern but is a complex subject in and of itself.  Allow FederatedCluster and FederatedMachine resources (like FederatedDeployments) to be used elsewhere to extend the functionality of this project if/where it makes sense.
 
-See multi-cluster implications below for related design considerations.
+Projects such as the [cluster API AWS provider](https://github.com/kubernetes-sigs/cluster-api-provider-aws) use an inception cluster to create and manage infrastructure for other clusters.  It is inherently multi-cluster, by design.
+
+A core design goal of this project is to use a cluster's API to manage it's own infrastructure which makes it a self-contained concern that can _optionally_ be federated.
+
+![multi-cluster](multi-cluster.png)
 
 ### Simple & Robust
 
-The most direct path a Kubernetes cluster is:
+The most direct path to a Kubernetes cluster is:
 
 1. call the IaaS provider's API and provision the required infrastructure
-2. run `kubeadm init` on the machine when it comes up
+2. run `kubeadm init` on a machine when it comes up
 
-Do just these two things programmatically with as few steps as possible.  Then the controller for the Cluster and Machine resources can be added as soon as the cluster is up.
+Do just these two things programmatically with as few steps as possible.  Then the controller for the Cluster and Machine resources can be added to manage the infrastructure from there.
 
 ### Configurable
 
@@ -47,9 +51,4 @@ No connections should need to be made to the machines by config management progr
 
 Allow for other cluster provisioning tools to be used.  Spin a cluster up your way.  Just install the infra controller as an addon.  `bootctl create` is a secondary concern - merely a convenience to achieving the primary goal.
 
-## Multi-Cluster Implications
-
-Implement functionality that enables the "Federation" model in the diagram below:
-
-![multi-cluster](multi-cluster.png)
 
